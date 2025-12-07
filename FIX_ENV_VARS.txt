@@ -1,0 +1,80 @@
+# FIX: Environment Variables Showing NULL
+
+## Problem
+When using PowerShell backticks with `az webapp config appsettings set`, the values show as null.
+
+## Solution: Use Azure Portal (Easiest)
+
+### Method 1: Azure Portal (Recommended)
+
+1. Go to: https://portal.azure.com
+2. Navigate to: **App Services** → **freya-trades**
+3. In left menu, click: **Configuration** (under Settings)
+4. Click: **+ New application setting**
+5. Add each setting:
+
+**Setting 1:**
+- Name: `IP2LOCATION_API_KEY`
+- Value: `12DC6E9184F7FD5D9F8502A4844D8DCA`
+- Click **OK**
+
+**Setting 2:**
+- Name: `BLOCKED_COUNTRY_CODE`
+- Value: `IN`
+- Click **OK**
+
+**Setting 3:**
+- Name: `NODE_ENV`
+- Value: `production`
+- Click **OK**
+
+6. Click **Save** at the top
+7. Click **Continue** when prompted
+
+The app will restart automatically with the new settings.
+
+---
+
+### Method 2: PowerShell (Alternative)
+
+Use this exact format (no backticks):
+
+```powershell
+az webapp config appsettings set --resource-group freya-trades-rg --name freya-trades --settings "IP2LOCATION_API_KEY=12DC6E9184F7FD5D9F8502A4844D8DCA" "BLOCKED_COUNTRY_CODE=IN" "NODE_ENV=production"
+```
+
+---
+
+### Method 3: Set One at a Time
+
+```powershell
+az webapp config appsettings set -g freya-trades-rg -n freya-trades --settings IP2LOCATION_API_KEY=12DC6E9184F7FD5D9F8502A4844D8DCA
+
+az webapp config appsettings set -g freya-trades-rg -n freya-trades --settings BLOCKED_COUNTRY_CODE=IN
+
+az webapp config appsettings set -g freya-trades-rg -n freya-trades --settings NODE_ENV=production
+```
+
+---
+
+## Verify Settings
+
+After setting via Portal or CLI, verify:
+
+```powershell
+az webapp config appsettings list --name freya-trades --resource-group freya-trades-rg --output table
+```
+
+You should see actual values, not null.
+
+---
+
+## Restart App (if needed)
+
+```powershell
+az webapp restart --name freya-trades --resource-group freya-trades-rg
+```
+
+---
+
+**Use Azure Portal - it's the most reliable method!**

@@ -7,40 +7,52 @@
 
 ---
 
+## ⚠️ IMPORTANT: Resource Group Location
+
+**Your Setup:**
+- **Resource Group:** `freya-trades-rg` (location: eastus) ✅ Already exists
+- **App Service Plan:** `freya-trades-plan` (location: centralindia) ✅
+- **Web App:** `freya-trades` (location: centralindia) ✅
+
+**This is CORRECT and expected!**
+- Resource group location ≠ resource location
+- Azure allows resources in different regions than their resource group
+- You can SKIP the `az group create` step (it already exists)
+
+---
+
 ## Quick Deploy Commands
 
 ```powershell
 # 1. Login to Azure
 az login
 
-# 2. Set variables (CHANGE THESE)
-$RESOURCE_GROUP="freya-trades-rg"
+# 2. Set variables
+$RESOURCE_GROUP="freya-trades-rg"  # Already exists in eastus
 $APP_NAME="freya-trades"
-$LOCATION="eastus"
+$LOCATION="centralindia"  # Resources will be in Central India
 
-# 3. Create everything
-az group create --name $RESOURCE_GROUP --location $LOCATION
+# 3. SKIP resource group creation (already exists)
+# az group create... <- SKIP THIS
 
+# 4. Create App Service Plan (in Central India)
 az appservice plan create `
   --name "$APP_NAME-plan" `
   --resource-group $RESOURCE_GROUP `
+  --location $LOCATION `
   --sku B1 `
   --is-linux
 
+# 5. Create Web App (in Central India)
 az webapp create `
   --resource-group $RESOURCE_GROUP `
   --plan "$APP_NAME-plan" `
   --name $APP_NAME `
   --runtime "NODE:20-lts"
 
-# 4. Set environment variables
-az webapp config appsettings set `
-  --resource-group $RESOURCE_GROUP `
-  --name $APP_NAME `
-  --settings `
-    IP2LOCATION_API_KEY="your_api_key_here" `
-    BLOCKED_COUNTRY_CODE="IN" `
-    NODE_ENV="production"
+# 6. Set environment variables (USE AZURE PORTAL - see FIX_ENV_VARS.txt)
+# Or use this command:
+az webapp config appsettings set -g $RESOURCE_GROUP -n $APP_NAME --settings "IP2LOCATION_API_KEY=12DC6E9184F7FD5D9F8502A4844D8DCA" "BLOCKED_COUNTRY_CODE=IN" "NODE_ENV=production"
 
 # 5. Configure deployment
 az webapp deployment source config-local-git `

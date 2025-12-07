@@ -1,0 +1,163 @@
+# AZURE DEPLOYMENT - CURRENT STATUS & NEXT STEPS
+
+## ✅ What's Deployed
+
+**Your Azure Resources:**
+- **Resource Group:** `freya-trades-rg` (eastus) ✅
+- **App Service Plan:** `freya-trades-plan` (centralindia) ✅  
+- **Web App:** `freya-trades` (centralindia) ✅ **RUNNING**
+- **Default URL:** https://freya-trades.azurewebsites.net
+
+**Location Setup is CORRECT:**
+- Resource group in eastus, resources in centralindia = ✅ Valid Azure configuration
+- No need to change or fix anything
+
+---
+
+## ⚠️ CRITICAL: Fix Environment Variables
+
+Your environment variables are currently NULL. You need to set them properly.
+
+### **Option 1: Azure Portal (EASIEST - Recommended)**
+
+1. Go to: https://portal.azure.com
+2. Navigate to: **App Services** → **freya-trades**
+3. Click: **Configuration** (left menu, under Settings)
+4. Click: **+ New application setting** for each:
+
+   **Setting 1:**
+   - Name: `IP2LOCATION_API_KEY`
+   - Value: `12DC6E9184F7FD5D9F8502A4844D8DCA`
+
+   **Setting 2:**
+   - Name: `BLOCKED_COUNTRY_CODE`
+   - Value: `IN`
+
+   **Setting 3:**
+   - Name: `NODE_ENV`
+   - Value: `production`
+
+5. Click **Save** at the top
+6. App will restart automatically
+
+### **Option 2: PowerShell Command**
+
+```powershell
+az webapp config appsettings set -g freya-trades-rg -n freya-trades --settings "IP2LOCATION_API_KEY=12DC6E9184F7FD5D9F8502A4844D8DCA" "BLOCKED_COUNTRY_CODE=IN" "NODE_ENV=production"
+```
+
+### **Verify Settings**
+
+```powershell
+az webapp config appsettings list --name freya-trades --resource-group freya-trades-rg --output table
+```
+
+You should see actual values, not null.
+
+---
+
+## 🌐 Add Custom Domains (After Fixing Env Vars)
+
+### Step 1: Add Domains to Azure
+
+```powershell
+# Add main domain
+az webapp config hostname add --webapp-name freya-trades --resource-group freya-trades-rg --hostname freyatrades.page
+
+# Add subdomain  
+az webapp config hostname add --webapp-name freya-trades --resource-group freya-trades-rg --hostname live.freyatrades.page
+```
+
+### Step 2: Get IP Address
+
+```powershell
+az webapp show --name freya-trades --resource-group freya-trades-rg --query outboundIpAddresses --output tsv
+```
+
+Copy the FIRST IP address.
+
+### Step 3: Configure DNS (in your domain registrar)
+
+**For freyatrades.page:**
+```
+Type: A
+Name: @
+Value: <IP from Step 2>
+TTL: 3600
+```
+
+**For live.freyatrades.page:**
+```
+Type: CNAME
+Name: live
+Value: freya-trades.azurewebsites.net
+TTL: 3600
+```
+
+### Step 4: Enable HTTPS (wait 10-30 min for DNS)
+
+```powershell
+# Main domain
+az webapp config ssl bind --name freya-trades --resource-group freya-trades-rg --certificate-thumbprint auto --ssl-type SNI --hostname freyatrades.page
+
+# Subdomain
+az webapp config ssl bind --name freya-trades --resource-group freya-trades-rg --certificate-thumbprint auto --ssl-type SNI --hostname live.freyatrades.page
+
+# Force HTTPS
+az webapp update --name freya-trades --resource-group freya-trades-rg --https-only true
+```
+
+---
+
+## 📋 Quick Reference
+
+**Test Current Deployment:**
+```
+https://freya-trades.azurewebsites.net
+```
+
+**View Logs:**
+```powershell
+az webapp log tail --name freya-trades --resource-group freya-trades-rg
+```
+
+**Restart App:**
+```powershell
+az webapp restart --name freya-trades --resource-group freya-trades-rg
+```
+
+**Update Code:**
+```powershell
+git add .
+git commit -m "Update"
+git push azure main
+```
+
+---
+
+## 📁 Documentation Files
+
+- **FIX_ENV_VARS.txt** - How to fix environment variables
+- **AZURE_NEXT_STEPS.txt** - Detailed next steps guide
+- **AZURE_QUICKSTART.txt** - Quick deployment commands
+- **AZURE_DEPLOY.txt** - Complete deployment guide
+
+---
+
+## ✅ Deployment Checklist
+
+- [x] Resource group created (eastus)
+- [x] App Service Plan created (centralindia)
+- [x] Web App created (centralindia)
+- [x] Web App is running
+- [ ] **Environment variables set** ← DO THIS NOW
+- [ ] Test app at azurewebsites.net URL
+- [ ] Add custom domains
+- [ ] Configure DNS records
+- [ ] Enable HTTPS/SSL
+
+---
+
+**NEXT ACTION: Set environment variables using Azure Portal!**
+
+See FIX_ENV_VARS.txt for detailed instructions.

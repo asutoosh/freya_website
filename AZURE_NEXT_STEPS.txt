@@ -1,0 +1,243 @@
+# NEXT STEPS - Complete Your Azure Deployment
+
+## ✅ Current Status
+- Web App: **Running**
+- Location: **Central India**
+- Default URL: https://freya-trades.azurewebsites.net
+
+---
+
+## Step 1: Set Environment Variables (REQUIRED)
+
+```powershell
+$RESOURCE_GROUP="freya-trades-rg"
+$APP_NAME="freya-trades"
+
+# Set production environment variables
+az webapp config appsettings set `
+  --resource-group $RESOURCE_GROUP `
+  --name $APP_NAME `
+  --settings `
+    IP2LOCATION_API_KEY="your_production_api_key_here" `
+    BLOCKED_COUNTRY_CODE="IN" `
+    NODE_ENV="production"
+```
+
+**IMPORTANT:** Replace `your_production_api_key_here` with your actual IP2Location API key!
+
+---
+
+## Step 2: Verify Deployment
+
+Visit your app:
+```
+https://freya-trades.azurewebsites.net
+```
+
+Check if it loads correctly. If you see errors, check logs:
+
+```powershell
+# View live logs
+az webapp log tail --name $APP_NAME --resource-group $RESOURCE_GROUP
+
+# Or download logs
+az webapp log download --name $APP_NAME --resource-group $RESOURCE_GROUP
+```
+
+---
+
+## Step 3: Add Custom Domains
+
+### 3.1 Add Domains to Azure
+
+```powershell
+# Add main domain
+az webapp config hostname add `
+  --webapp-name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --hostname freyatrades.page
+
+# Add subdomain
+az webapp config hostname add `
+  --webapp-name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --hostname live.freyatrades.page
+```
+
+### 3.2 Get IP Address for DNS
+
+```powershell
+# Get outbound IP addresses
+az webapp show `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --query outboundIpAddresses `
+  --output tsv
+```
+
+Copy the FIRST IP address from the output.
+
+### 3.3 Configure DNS Records
+
+Go to your domain registrar (where you bought freyatrades.page) and add:
+
+**For freyatrades.page (main domain):**
+```
+Type: A
+Name: @
+Value: <IP-from-step-3.2>
+TTL: 3600
+```
+
+**For live.freyatrades.page (subdomain):**
+```
+Type: CNAME
+Name: live
+Value: freya-trades.azurewebsites.net
+TTL: 3600
+```
+
+**Verification TXT Record (required by Azure):**
+```
+Type: TXT
+Name: asuid
+Value: <Get from Azure portal or run command below>
+TTL: 3600
+```
+
+Get verification ID:
+```powershell
+az webapp show `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --query customDomainVerificationId `
+  --output tsv
+```
+
+---
+
+## Step 4: Enable HTTPS/SSL
+
+After DNS propagates (wait 10-30 minutes), enable SSL:
+
+```powershell
+# Enable HTTPS for main domain
+az webapp config ssl bind `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --certificate-thumbprint auto `
+  --ssl-type SNI `
+  --hostname freyatrades.page
+
+# Enable HTTPS for subdomain
+az webapp config ssl bind `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --certificate-thumbprint auto `
+  --ssl-type SNI `
+  --hostname live.freyatrades.page
+
+# Force HTTPS only
+az webapp update `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --https-only true
+```
+
+---
+
+## Step 5: Test Your Live Sites
+
+After DNS propagates (24-48 hours max, usually 10-30 minutes):
+
+**Landing Page:**
+```
+https://freyatrades.page
+```
+
+**Protected Pages:**
+```
+https://live.freyatrades.page/money-glitch
+https://live.freyatrades.page/welcome
+https://live.freyatrades.page/how-it-works
+```
+
+---
+
+## Troubleshooting
+
+### App not loading
+```powershell
+# Check if app is running
+az webapp show --name $APP_NAME --resource-group $RESOURCE_GROUP --query state
+
+# Restart app
+az webapp restart --name $APP_NAME --resource-group $RESOURCE_GROUP
+
+# Check logs
+az webapp log tail --name $APP_NAME --resource-group $RESOURCE_GROUP
+```
+
+### Environment variables not set
+```powershell
+# List all settings
+az webapp config appsettings list `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --output table
+```
+
+### Domain not working
+1. Wait 10-30 minutes for DNS propagation
+2. Verify DNS records with: https://dnschecker.org
+3. Check domain binding:
+```powershell
+az webapp config hostname list `
+  --webapp-name $APP_NAME `
+  --resource-group $RESOURCE_GROUP
+```
+
+---
+
+## Update Your App
+
+To deploy updates:
+
+```powershell
+# Make your changes
+# ...
+
+# Commit and push
+git add .
+git commit -m "Update description"
+git push azure main
+```
+
+Azure will automatically rebuild and redeploy!
+
+---
+
+## Quick Commands Reference
+
+```powershell
+# View app info
+az webapp show --name freya-trades --resource-group freya-trades-rg
+
+# View logs
+az webapp log tail --name freya-trades --resource-group freya-trades-rg
+
+# Restart app
+az webapp restart --name freya-trades --resource-group freya-trades-rg
+
+# List environment variables
+az webapp config appsettings list --name freya-trades --resource-group freya-trades-rg
+
+# Scale up (change pricing tier)
+az appservice plan update --name freya-trades-plan --resource-group freya-trades-rg --sku P1V2
+```
+
+---
+
+**Your app is deployed and running! 🚀**
+
+Complete Steps 1-4 above to finish the setup!
