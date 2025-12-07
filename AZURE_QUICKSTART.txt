@@ -1,0 +1,137 @@
+# AZURE QUICK START - 5 Minutes to Deploy
+
+## Prerequisites
+- Azure account (sign up at portal.azure.com)
+- Azure CLI installed
+- Git initialized in your project
+
+---
+
+## Quick Deploy Commands
+
+```powershell
+# 1. Login to Azure
+az login
+
+# 2. Set variables (CHANGE THESE)
+$RESOURCE_GROUP="freya-trades-rg"
+$APP_NAME="freya-trades"
+$LOCATION="eastus"
+
+# 3. Create everything
+az group create --name $RESOURCE_GROUP --location $LOCATION
+
+az appservice plan create `
+  --name "$APP_NAME-plan" `
+  --resource-group $RESOURCE_GROUP `
+  --sku B1 `
+  --is-linux
+
+az webapp create `
+  --resource-group $RESOURCE_GROUP `
+  --plan "$APP_NAME-plan" `
+  --name $APP_NAME `
+  --runtime "NODE:20-lts"
+
+# 4. Set environment variables
+az webapp config appsettings set `
+  --resource-group $RESOURCE_GROUP `
+  --name $APP_NAME `
+  --settings `
+    IP2LOCATION_API_KEY="your_api_key_here" `
+    BLOCKED_COUNTRY_CODE="IN" `
+    NODE_ENV="production"
+
+# 5. Configure deployment
+az webapp deployment source config-local-git `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP
+
+# 6. Get deployment URL
+$deployUrl = az webapp deployment list-publishing-credentials `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --query scmUri `
+  --output tsv
+
+# 7. Deploy
+git remote add azure $deployUrl
+git add .
+git commit -m "Deploy to Azure"
+git push azure main
+```
+
+---
+
+## Add Custom Domains
+
+```powershell
+# Add domains
+az webapp config hostname add `
+  --webapp-name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --hostname freyatrades.page
+
+az webapp config hostname add `
+  --webapp-name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --hostname live.freyatrades.page
+
+# Enable HTTPS
+az webapp config ssl bind `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --certificate-thumbprint auto `
+  --ssl-type SNI `
+  --hostname freyatrades.page
+
+az webapp config ssl bind `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --certificate-thumbprint auto `
+  --ssl-type SNI `
+  --hostname live.freyatrades.page
+```
+
+---
+
+## DNS Configuration
+
+**In your domain registrar:**
+
+**freyatrades.page:**
+```
+Type: A
+Name: @
+Value: <Get from: az webapp show --name $APP_NAME --resource-group $RESOURCE_GROUP --query outboundIpAddresses>
+```
+
+**live.freyatrades.page:**
+```
+Type: CNAME
+Name: live
+Value: freya-trades.azurewebsites.net
+```
+
+---
+
+## Test Your Deployment
+
+- Landing: https://freyatrades.page
+- Protected: https://live.freyatrades.page/money-glitch
+
+---
+
+## Update After Changes
+
+```powershell
+git add .
+git commit -m "Update"
+git push azure main
+```
+
+---
+
+**Done! Your site is live on Azure! 🚀**
+
+For detailed instructions, see AZURE_DEPLOY.txt

@@ -1,0 +1,493 @@
+# AZURE DEPLOYMENT GUIDE - Freya Trades
+
+## ✅ Build Status: SUCCESS
+
+Your project is ready for Microsoft Azure App Service deployment!
+
+---
+
+## 🌐 Domain Configuration
+
+**Landing Page (Home):**
+- Domain: `freyatrades.page`
+- Route: `/`
+
+**Protected Pages (Money-Glitch, Welcome, etc.):**
+- Domain: `live.freyatrades.page`
+- Routes: `/money-glitch`, `/welcome`, `/how-it-works`, etc.
+
+---
+
+## 🚀 Deploy to Azure App Service
+
+### Prerequisites
+
+1. **Azure Account** - Sign up at [portal.azure.com](https://portal.azure.com)
+2. **Azure CLI** - Install from [docs.microsoft.com/cli/azure/install-azure-cli](https://docs.microsoft.com/cli/azure/install-azure-cli)
+3. **Git** - Ensure git is installed
+
+---
+
+## Step 1: Prepare Your Project
+
+### 1.1 Install Azure CLI (if not installed)
+
+**Windows (PowerShell):**
+```powershell
+winget install -e --id Microsoft.AzureCLI
+```
+
+**Or download installer:**
+https://aka.ms/installazurecliwindows
+
+### 1.2 Login to Azure
+
+```bash
+az login
+```
+
+This will open your browser for authentication.
+
+### 1.3 Create Azure Resources
+
+```bash
+# Set variables
+$RESOURCE_GROUP="freya-trades-rg"
+$LOCATION="eastus"
+$APP_NAME="freya-trades"
+$PLAN_NAME="freya-trades-plan"
+
+# Create resource group
+az group create --name $RESOURCE_GROUP --location $LOCATION
+
+# Create App Service plan (Linux, Node.js)
+az appservice plan create `
+  --name $PLAN_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --sku B1 `
+  --is-linux
+
+# Create Web App
+az webapp create `
+  --resource-group $RESOURCE_GROUP `
+  --plan $PLAN_NAME `
+  --name $APP_NAME `
+  --runtime "NODE:20-lts"
+```
+
+---
+
+## Step 2: Configure Environment Variables
+
+```bash
+# Set environment variables in Azure
+az webapp config appsettings set `
+  --resource-group $RESOURCE_GROUP `
+  --name $APP_NAME `
+  --settings `
+    IP2LOCATION_API_KEY="your_production_api_key_here" `
+    BLOCKED_COUNTRY_CODE="IN" `
+    NODE_ENV="production"
+```
+
+**IMPORTANT:** Do NOT set `DEV_MODE`, `NEXT_PUBLIC_DEV_MODE`, or `BYPASS_COUNTRY_CODE` in production!
+
+---
+
+## Step 3: Configure Deployment
+
+### Option A: Deploy from GitHub (Recommended)
+
+```bash
+# Configure GitHub deployment
+az webapp deployment source config `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --repo-url https://github.com/yourusername/freya-trades `
+  --branch main `
+  --manual-integration
+```
+
+### Option B: Deploy from Local Git
+
+```bash
+# Enable local git deployment
+az webapp deployment source config-local-git `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP
+
+# Get deployment URL
+az webapp deployment list-publishing-credentials `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --query scmUri `
+  --output tsv
+
+# Add Azure remote
+git remote add azure <deployment-url-from-above>
+
+# Push to Azure
+git push azure main
+```
+
+---
+
+## Step 4: Configure Custom Domains
+
+### 4.1 Add Custom Domains to Azure
+
+```bash
+# Add main domain (freyatrades.page)
+az webapp config hostname add `
+  --webapp-name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --hostname freyatrades.page
+
+# Add subdomain (live.freyatrades.page)
+az webapp config hostname add `
+  --webapp-name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --hostname live.freyatrades.page
+```
+
+### 4.2 Configure DNS Records
+
+In your domain registrar (where you bought freyatrades.page), add these DNS records:
+
+**For freyatrades.page (main domain):**
+```
+Type: A
+Name: @
+Value: <Azure-App-IP-Address>
+TTL: 3600
+```
+
+**For live.freyatrades.page (subdomain):**
+```
+Type: CNAME
+Name: live
+Value: freya-trades.azurewebsites.net
+TTL: 3600
+```
+
+**Get Azure App IP Address:**
+```bash
+az webapp show `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --query outboundIpAddresses `
+  --output tsv
+```
+
+### 4.3 Enable HTTPS (SSL)
+
+```bash
+# Enable HTTPS for main domain
+az webapp config ssl bind `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --certificate-thumbprint auto `
+  --ssl-type SNI `
+  --hostname freyatrades.page
+
+# Enable HTTPS for subdomain
+az webapp config ssl bind `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --certificate-thumbprint auto `
+  --ssl-type SNI `
+  --hostname live.freyatrades.page
+```
+
+---
+
+## Step 5: Configure Next.js for Azure
+
+### 5.1 Create startup script
+
+Create `startup.sh` in project root:
+
+```bash
+#!/bin/bash
+npm install
+npm run build
+npm start
+```
+
+### 5.2 Update package.json scripts
+
+Ensure your `package.json` has:
+
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start -p 8080",
+    "lint": "next lint"
+  }
+}
+```
+
+### 5.3 Configure Azure startup command
+
+```bash
+az webapp config set `
+  --resource-group $RESOURCE_GROUP `
+  --name $APP_NAME `
+  --startup-file "npm start"
+```
+
+---
+
+## Step 6: Deploy Your Application
+
+### Push to GitHub (if using GitHub deployment)
+
+```bash
+# Add all files
+git add .
+
+# Commit
+git commit -m "Production ready for Azure"
+
+# Push to GitHub
+git push origin main
+```
+
+Azure will automatically detect the push and deploy.
+
+### Or Push Directly to Azure
+
+```bash
+git push azure main
+```
+
+---
+
+## Step 7: Verify Deployment
+
+### Check deployment status
+
+```bash
+# View logs
+az webapp log tail `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP
+```
+
+### Test your domains
+
+1. **Landing Page:** https://freyatrades.page
+2. **Protected Pages:** https://live.freyatrades.page/money-glitch
+
+---
+
+## 📋 Environment Variables Checklist
+
+**Required in Azure:**
+- [x] `IP2LOCATION_API_KEY` - Your production API key
+- [x] `BLOCKED_COUNTRY_CODE` - Country to block (default: IN)
+- [x] `NODE_ENV` - Set to "production"
+
+**DO NOT SET:**
+- [ ] `DEV_MODE`
+- [ ] `NEXT_PUBLIC_DEV_MODE`
+- [ ] `BYPASS_COUNTRY_CODE`
+
+---
+
+## 🔧 Useful Azure Commands
+
+### View application settings
+```bash
+az webapp config appsettings list `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP
+```
+
+### Restart app
+```bash
+az webapp restart `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP
+```
+
+### View deployment logs
+```bash
+az webapp log deployment show `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP
+```
+
+### Scale up (change pricing tier)
+```bash
+az appservice plan update `
+  --name $PLAN_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --sku P1V2
+```
+
+---
+
+## 💰 Pricing Tiers
+
+**B1 (Basic)** - ~$13/month
+- 1.75 GB RAM
+- 1 Core
+- Good for testing
+
+**P1V2 (Production)** - ~$73/month
+- 3.5 GB RAM
+- 1 Core
+- Better performance
+
+**P2V2 (High Traffic)** - ~$146/month
+- 7 GB RAM
+- 2 Cores
+- Recommended for production
+
+---
+
+## 🔄 Update Deployment
+
+To update your live site:
+
+```bash
+# Make changes
+# ...
+
+# Commit
+git add .
+git commit -m "Update message"
+
+# Push (Azure auto-deploys)
+git push origin main
+
+# Or push directly to Azure
+git push azure main
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### App not starting
+```bash
+# Check logs
+az webapp log tail --name $APP_NAME --resource-group $RESOURCE_GROUP
+
+# Verify Node version
+az webapp config show --name $APP_NAME --resource-group $RESOURCE_GROUP
+```
+
+### Environment variables not working
+```bash
+# List all settings
+az webapp config appsettings list --name $APP_NAME --resource-group $RESOURCE_GROUP
+
+# Update specific setting
+az webapp config appsettings set --name $APP_NAME --resource-group $RESOURCE_GROUP --settings KEY=VALUE
+```
+
+### Domain not working
+1. Verify DNS records are correct
+2. Wait 24-48 hours for DNS propagation
+3. Check domain binding:
+```bash
+az webapp config hostname list --webapp-name $APP_NAME --resource-group $RESOURCE_GROUP
+```
+
+### SSL certificate issues
+```bash
+# Check SSL bindings
+az webapp config ssl list --resource-group $RESOURCE_GROUP
+
+# Re-bind SSL
+az webapp config ssl bind --name $APP_NAME --resource-group $RESOURCE_GROUP --certificate-thumbprint auto --ssl-type SNI --hostname freyatrades.page
+```
+
+---
+
+## 📊 Monitoring
+
+### Enable Application Insights
+
+```bash
+# Create Application Insights
+az monitor app-insights component create `
+  --app freya-trades-insights `
+  --location $LOCATION `
+  --resource-group $RESOURCE_GROUP `
+  --application-type web
+
+# Link to Web App
+az webapp config appsettings set `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --settings APPLICATIONINSIGHTS_CONNECTION_STRING="<connection-string>"
+```
+
+### View metrics in Azure Portal
+
+1. Go to [portal.azure.com](https://portal.azure.com)
+2. Navigate to your Web App
+3. Click "Monitoring" → "Metrics"
+4. View traffic, errors, response times
+
+---
+
+## 🔐 Security Best Practices
+
+1. **Enable HTTPS Only**
+```bash
+az webapp update --name $APP_NAME --resource-group $RESOURCE_GROUP --https-only true
+```
+
+2. **Enable Managed Identity**
+```bash
+az webapp identity assign --name $APP_NAME --resource-group $RESOURCE_GROUP
+```
+
+3. **Configure IP Restrictions** (optional)
+```bash
+az webapp config access-restriction add `
+  --name $APP_NAME `
+  --resource-group $RESOURCE_GROUP `
+  --rule-name "AllowSpecificIP" `
+  --action Allow `
+  --ip-address "1.2.3.4/32" `
+  --priority 100
+```
+
+---
+
+## 📞 Support
+
+- **Azure Support:** https://azure.microsoft.com/support
+- **Azure Documentation:** https://docs.microsoft.com/azure/app-service
+- **Next.js on Azure:** https://learn.microsoft.com/azure/app-service/quickstart-nodejs
+
+---
+
+## ✅ Deployment Checklist
+
+- [ ] Azure CLI installed
+- [ ] Logged into Azure (`az login`)
+- [ ] Resource group created
+- [ ] App Service created
+- [ ] Environment variables configured
+- [ ] Custom domains added (freyatrades.page, live.freyatrades.page)
+- [ ] DNS records configured
+- [ ] SSL certificates enabled
+- [ ] Application deployed
+- [ ] Tested both domains
+- [ ] Monitoring enabled
+
+---
+
+**Your application is ready to deploy to Azure! 🚀**
+
+Follow the steps above to get your site live on:
+- https://freyatrades.page (landing page)
+- https://live.freyatrades.page (protected pages)
